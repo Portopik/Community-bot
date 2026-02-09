@@ -5,17 +5,13 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
 
 # ========== НАСТРОЙКИ ==========
-# ⚠️ ВАЖНО: Получите токен у @BotFather и вставьте его ниже
-TOKEN = "8533919423:AAEmkagykEzeRorF-MzkQSIrrITwcpQRtP8"  # <-- ЗАМЕНИТЕ ЭТО!
-
-# Секретный код разработчика
-DEVELOPER_CODE = "ndjskom900nwykmsyint8mdyuume7kz7o3nd7knstghnn"
+TOKEN = "8533919423:AAEmkagykEzeRorF-MzkQSIrrITwcpQRtP8"  # ЗАМЕНИТЕ НА ВАШ ТОКЕН ОТ @BotFather
 
 # Ссылки
-RULES_LINK = "https://t.me/+-yBQzgebofs2MWUy"  # Правила
-CHAT_LINK = "https://t.me/+xvWIFeupCAtkZDgy"   # Чат
+RULES_LINK = "https://t.me/+-yBQzgebofs2MWUy"
+CHAT_LINK = "https://t.me/+xvWIFeupCAtkZDgy"
 
-# Ранги
+# Ранги (10 ранга нет для обычных пользователей)
 RANKS = [
     {"symbol": "?", "name": "Луркер 🕶️", "xp": 0},
     {"symbol": "??", "name": "Ньюфаг 🐣", "xp": 50},
@@ -25,22 +21,113 @@ RANKS = [
     {"symbol": "??????", "name": "Криэйтор ✨", "xp": 800},
     {"symbol": "???????", "name": "Модератор ⚖️", "xp": 1200},
     {"symbol": "????????", "name": "Интегратор 🔗", "xp": 1700},
-    {"symbol": "?????????", "name": "Легенда 🏆", "xp": 2300},
-    {"symbol": "??????????", "name": "ОГ (Original G) 👑", "xp": 3000}
+    {"symbol": "?????????", "name": "Легенда 🏆", "xp": 2300}
+    # 10 ранг (?????????? — ОГ (Original G) 👑) только для разработчика
 ]
+
+# Конфигурация заданий (без заданий для 10 ранга)
+QUESTS = {
+    # Для рангов 1-3 (0-299 XP)
+    "rank_1_3": [
+        {
+            "id": "chat_top3",
+            "name": "Общительный 💬",
+            "description": "Занять ТОП-3 по сообщениям за день",
+            "type": "chat_top",
+            "goal": 3,
+            "reward_xp": 30,
+            "reward_bonus": 10,
+            "icon": "💬"
+        },
+        {
+            "id": "heart_giver",
+            "name": "Оценщик ❤️",
+            "description": "Отправить 3 реакции ❤️ другим пользователям",
+            "type": "hearts_given",
+            "goal": 3,
+            "reward_xp": 25,
+            "reward_bonus": 8,
+            "icon": "❤️"
+        },
+        {
+            "id": "good_behavior",
+            "name": "Послушатель 😇",
+            "description": "Не получать наказаний целый день",
+            "type": "no_punishments",
+            "goal": 1,
+            "reward_xp": 20,
+            "reward_bonus": 5,
+            "icon": "😇"
+        }
+    ],
+    
+    # Для рангов 4-7 (300-1199 XP)
+    "rank_4_7": [
+        {
+            "id": "like_giver",
+            "name": "Добряк 👍",
+            "description": "Отправить 1 реакцию 👍 пользователю",
+            "type": "likes_given",
+            "goal": 1,
+            "reward_xp": 40,
+            "reward_bonus": 15,
+            "icon": "👍"
+        },
+        {
+            "id": "warn_giver",
+            "name": "Надзиратель ⚠️",
+            "description": "Выдать варн за нарушение правил",
+            "type": "warns_given",
+            "goal": 1,
+            "reward_xp": 50,
+            "reward_bonus": 20,
+            "icon": "⚠️"
+        }
+    ],
+    
+    # Для рангов 7-9 (1200-2300 XP)
+    "rank_7_9": [
+        {
+            "id": "nerd_giver",
+            "name": "Мудрец 🤓",
+            "description": "Отправить реакцию 🤓 пользователю",
+            "type": "nerds_given",
+            "goal": 1,
+            "reward_xp": 60,
+            "reward_bonus": 25,
+            "icon": "🤓"
+        },
+        {
+            "id": "content_creator",
+            "name": "Контент-мейкер 🎨",
+            "description": "Создать полезный контент для сообщества",
+            "type": "content_created",
+            "goal": 1,
+            "reward_xp": 70,
+            "reward_bonus": 30,
+            "icon": "🎨"
+        },
+        {
+            "id": "community_leader",
+            "name": "Лидер сообщества 👑",
+            "description": "Провести мини-ивент или активность",
+            "type": "event_hosted",
+            "goal": 1,
+            "reward_xp": 80,
+            "reward_bonus": 35,
+            "icon": "👑"
+        }
+    ]
+}
 
 # Данные
 users = {}
 sticker_tracker = {}
-developers = {}
 
 # ========== ФУНКЦИИ СОХРАНЕНИЯ ==========
 def save_data():
     """Сохранить данные в файл"""
-    data = {
-        "users": users,
-        "last_reset": datetime.now().isoformat()
-    }
+    data = {"users": users}
     with open("bot_data.json", "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
@@ -52,37 +139,8 @@ def load_data():
             with open("bot_data.json", "r", encoding="utf-8") as f:
                 data = json.load(f)
                 users = data.get("users", {})
-                # Сброс дневных счетчиков если прошло больше дня
-                last_reset_str = data.get("last_reset")
-                if last_reset_str:
-                    last_reset = datetime.fromisoformat(last_reset_str)
-                    if (datetime.now() - last_reset).days >= 1:
-                        reset_daily_counts()
         except:
             users = {}
-
-def load_developers():
-    """Загрузить разработчиков"""
-    global developers
-    if os.path.exists("developers.json"):
-        try:
-            with open("developers.json", "r", encoding="utf-8") as f:
-                developers = json.load(f)
-        except:
-            developers = {}
-
-def save_developers():
-    """Сохранить разработчиков"""
-    with open("developers.json", "w", encoding="utf-8") as f:
-        json.dump(developers, f, ensure_ascii=False, indent=2)
-
-def reset_daily_counts():
-    """Сбросить дневные счетчики"""
-    for user_id, user in users.items():
-        user["hearts_today"] = 0
-        user["likes_today"] = 0
-        user["nerds_today"] = 0
-    save_data()
 
 # ========== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ==========
 def get_rank_info(xp):
@@ -92,85 +150,108 @@ def get_rank_info(xp):
             return rank["symbol"], rank["name"]
     return RANKS[0]["symbol"], RANKS[0]["name"]
 
-def can_add_xp(user_data, xp_type):
-    """Проверить можно ли добавить XP"""
+def init_user_quests():
+    """Инициализировать квесты для нового пользователя"""
+    return {
+        "daily_progress": {
+            "hearts_given": 0,
+            "likes_given": 0,
+            "nerds_given": 0,
+            "warns_given": 0,
+            "punishments_received": 0,
+            "content_created": 0,
+            "event_hosted": 0,
+            "messages_today": 0
+        },
+        "completed_today": [],
+        "completed_total": [],
+        "last_reset": datetime.now().isoformat(),
+        "bonus_points": 0,
+        "total_xp_from_quests": 0
+    }
+
+def get_available_quests(xp):
+    """Получить доступные квесты для ранга"""
+    if xp < 300:  # Ранги 1-3
+        return QUESTS["rank_1_3"]
+    elif xp < 1200:  # Ранги 4-7
+        return QUESTS["rank_4_7"]
+    else:  # Ранги 7-9 (максимум для обычных пользователей)
+        return QUESTS["rank_7_9"]
+
+def check_daily_reset(user_quests):
+    """Проверить и сбросить ежедневные задания"""
+    if "last_reset" not in user_quests:
+        return user_quests
+    
+    last_reset = datetime.fromisoformat(user_quests["last_reset"])
     now = datetime.now()
     
-    if xp_type == "heart":
-        if user_data.get("hearts_today", 0) >= 10:
-            return False, "Лимит: 10 ❤️ в день"
-        
-        last_time = user_data.get("last_heart")
-        if last_time:
-            last = datetime.fromisoformat(last_time)
-            if (now - last).seconds < 60:
-                return False, "Ждите 60 секунд"
-        
-        return True, ""
+    # Если прошло больше дня
+    if (now - last_reset).days >= 1:
+        user_quests["daily_progress"] = {
+            "hearts_given": 0,
+            "likes_given": 0,
+            "nerds_given": 0,
+            "warns_given": 0,
+            "punishments_received": 0,
+            "content_created": 0,
+            "event_hosted": 0,
+            "messages_today": 0
+        }
+        user_quests["completed_today"] = []
+        user_quests["last_reset"] = now.isoformat()
     
-    elif xp_type == "like":
-        if user_data["xp"] < 150:
-            return False, "👍 доступно с 3 ранга (150 XP)"
-        
-        if user_data.get("likes_today", 0) >= 2:
-            return False, "Лимит: 2 👍 в день"
-        
-        last_time = user_data.get("last_like")
-        if last_time:
-            last = datetime.fromisoformat(last_time)
-            if (now - last).seconds < 300:
-                return False, "Ждите 5 минут"
-        
-        return True, ""
-    
-    elif xp_type == "nerd":
-        if user_data["xp"] < 1200:
-            return False, "🤓 доступно с 7 ранга (1200 XP)"
-        
-        last_time = user_data.get("last_nerd")
-        if last_time and datetime.fromisoformat(last_time).date() == now.date():
-            return False, "Лимит: 1 🤓 в день"
-        
-        return True, ""
-    
-    return False, "Неизвестный тип"
+    return user_quests
 
-def add_xp(user_id, amount, xp_type):
-    """Добавить XP пользователю"""
-    if user_id not in users:
-        return False, "Пользователь не найден"
-    
-    user = users[user_id]
-    user["xp"] += amount
-    
-    # Обновляем время последнего действия
-    now = datetime.now()
-    if xp_type == "heart":
-        user["last_heart"] = now.isoformat()
-        user["hearts_today"] = user.get("hearts_today", 0) + 1
-    elif xp_type == "like":
-        user["last_like"] = now.isoformat()
-        user["likes_today"] = user.get("likes_today", 0) + 1
-    elif xp_type == "nerd":
-        user["last_nerd"] = now.isoformat()
-        user["nerds_today"] = user.get("nerds_today", 0) + 1
-    
-    # Проверяем повышение ранга
-    old_symbol = user.get("rank_symbol", "?")
-    new_symbol, new_name = get_rank_info(user["xp"])
-    
-    rank_up = old_symbol != new_symbol
-    
-    if rank_up:
-        user["rank_symbol"] = new_symbol
-        user["rank_name"] = new_name
-    
-    save_data()
-    return rank_up, new_name
+def update_quest_progress(user_quests, quest_type, amount=1):
+    """Обновить прогресс задания"""
+    if quest_type in user_quests["daily_progress"]:
+        user_quests["daily_progress"][quest_type] += amount
+    return user_quests
 
-def is_developer(user_id):
-    """Проверка является ли пользователь разработчиком"""
-    return str(user_id) in developers
+def check_quest_completion(user_quests, xp):
+    """Проверить выполнение заданий"""
+    available_quests = get_available_quests(xp)
+    rewards = {"xp": 0, "bonus": 0, "completed": []}
+    
+    for quest in available_quests:
+        # Пропускаем уже выполненные сегодня
+        if quest["id"] in user_quests.get("completed_today", []):
+            continue
+        
+        progress = user_quests["daily_progress"].get(quest["type"], 0)
+        
+        # Проверяем выполнение
+        if quest["type"] == "no_punishments":
+            if user_quests["daily_progress"].get("punishments_received", 0) == 0:
+                completed = True
+            else:
+                completed = False
+        else:
+            completed = progress >= quest["goal"]
+        
+        if completed:
+            rewards["xp"] += quest["reward_xp"]
+            rewards["bonus"] += quest["reward_bonus"]
+            rewards["completed"].append(quest["name"])
+            
+            # Добавляем в выполненные
+            if "completed_today" not in user_quests:
+                user_quests["completed_today"] = []
+            user_quests["completed_today"].append(quest["id"])
+            
+            # В общий список
+            if quest["id"] not in user_quests.get("completed_total", []):
+                if "completed_total" not in user_quests:
+                    user_quests["completed_total"] = []
+                user_quests["completed_total"].append(quest["id"])
+    
+    # Обновляем бонусные очки
+    user_quests["bonus_points"] = user_quests.get("bonus_points", 0) + rewards["bonus"]
+    user_quests["total_xp_from_quests"] = user_quests.get("total_xp_from_quests", 0) + rewards["xp"]
+    
+    return user_quests, rewards
 
 # ========== ОСНОВНЫЕ КОМАНДЫ ==========
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -209,8 +290,8 @@ async def join_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "last_like": None,
         "likes_today": 0,
         "last_nerd": None,
-        "nerds_today": 0,
-        "warns": []
+        "warns": [],
+        "quests": init_user_quests()
     }
     
     save_data()
@@ -248,7 +329,7 @@ async def profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
             next_rank = rank
             break
     
-    needed_xp = next_rank["xp"] - user["xp"] if next_rank else "МАКС"
+    needed_xp = next_rank["xp"] - user["xp"] if next_rank else "МАКСИМУМ ДОСТИГНУТ!"
     
     message = f"""🎴 ВАША КАРТОЧКА:
 
@@ -269,17 +350,55 @@ async def heart_xp(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Сначала /start")
         return
     
-    can, error = can_add_xp(users[user_id], "heart")
-    if not can:
-        await update.message.reply_text(f"❌ {error}")
-        return
+    user = users[user_id]
+    now = datetime.now()
     
-    rank_up, new_rank = add_xp(user_id, 1, "heart")
+    # Проверка таймера (1 раз в минуту)
+    if user["last_heart"]:
+        last = datetime.fromisoformat(user["last_heart"])
+        if (now - last).seconds < 60:
+            time_left = 60 - (now - last).seconds
+            await update.message.reply_text(f"⏳ Подождите {time_left} секунд")
+            return
     
-    response = f"❤️ +1 XP!\nВсего XP: {users[user_id]['xp']}"
+    # Проверка дневного лимита
+    if user["last_heart"] and datetime.fromisoformat(user["last_heart"]).date() == now.date():
+        if user.get("hearts_today", 0) >= 10:
+            await update.message.reply_text("⚠️ Лимит: 10 ❤️ в день")
+            return
+    
+    # Начисление XP
+    user["xp"] += 1
+    user["last_heart"] = now.isoformat()
+    user["hearts_today"] = user.get("hearts_today", 0) + 1
+    
+    # Обновляем прогресс задания
+    if "quests" in user:
+        user["quests"] = update_quest_progress(user["quests"], "hearts_given")
+    
+    # Проверка повышения ранга
+    old_rank = user["rank_name"]
+    new_symbol, new_name = get_rank_info(user["xp"])
+    
+    if old_rank != new_name:
+        user["rank_symbol"] = new_symbol
+        user["rank_name"] = new_name
+        rank_up = True
+    else:
+        rank_up = False
+    
+    # Проверяем выполнение заданий
+    if "quests" in user:
+        user["quests"], rewards = check_quest_completion(user["quests"], user["xp"])
+        if rewards["xp"] > 0:
+            user["xp"] += rewards["xp"]
+    
+    save_data()
+    
+    response = f"❤️ +1 XP!\nВсего XP: {user['xp']}"
     
     if rank_up:
-        response = f"🎉 ПОЗДРАВЛЯЕМ! Новый ранг: {new_rank}\n" + response
+        response = f"🎉 ПОЗДРАВЛЯЕМ! Новый ранг: {new_name}\n" + response
     
     await update.message.reply_text(response)
 
@@ -291,17 +410,60 @@ async def like_xp(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Сначала /start")
         return
     
-    can, error = can_add_xp(users[user_id], "like")
-    if not can:
-        await update.message.reply_text(f"❌ {error}")
+    user = users[user_id]
+    now = datetime.now()
+    
+    # Проверка ранга (с 3 ранга = 150 XP)
+    if user["xp"] < 150:
+        await update.message.reply_text("👍 доступно с 3 ранга (150 XP)")
         return
     
-    rank_up, new_rank = add_xp(user_id, 5, "like")
+    # Проверка таймера (1 раз в 5 минут)
+    if user["last_like"]:
+        last = datetime.fromisoformat(user["last_like"])
+        if (now - last).seconds < 300:
+            time_left = 300 - (now - last).seconds
+            await update.message.reply_text(f"⏳ Подождите {time_left//60} минут")
+            return
     
-    response = f"👍 +5 XP!\nВсего XP: {users[user_id]['xp']}"
+    # Проверка дневного лимита
+    if user["last_like"] and datetime.fromisoformat(user["last_like"]).date() == now.date():
+        if user.get("likes_today", 0) >= 2:
+            await update.message.reply_text("⚠️ Лимит: 2 👍 в день")
+            return
+    
+    # Начисление XP
+    user["xp"] += 5
+    user["last_like"] = now.isoformat()
+    user["likes_today"] = user.get("likes_today", 0) + 1
+    
+    # Обновляем прогресс задания
+    if "quests" in user:
+        user["quests"] = update_quest_progress(user["quests"], "likes_given")
+    
+    # Проверка повышения ранга
+    old_rank = user["rank_name"]
+    new_symbol, new_name = get_rank_info(user["xp"])
+    
+    if old_rank != new_name:
+        user["rank_symbol"] = new_symbol
+        user["rank_name"] = new_name
+        rank_up = True
+    else:
+        rank_up = False
+    
+    # Проверяем выполнение заданий
+    if "quests" in user:
+        user["quests"], rewards = check_quest_completion(user["quests"], user["xp"])
+        if rewards["xp"] > 0:
+            user["xp"] += rewards["xp"]
+    
+    save_data()
+    
+    response = f"👍 +5 XP!\nВсего XP: {user['xp']}"
     
     if rank_up:
-        response = f"🎉 ПОЗДРАВЛЯЕМ! Новый ранг: {new_rank}\n" + response
+        response = f"🎉 ПОЗДРАВЛЯЕМ! Новый ранг: {new_name}\n" + response
     
     await update.message.reply_text(response)
 
@@ -313,19 +475,159 @@ async def nerd_xp(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Сначала /start")
         return
     
-    can, error = can_add_xp(users[user_id], "nerd")
-    if not can:
-        await update.message.reply_text(f"❌ {error}")
+    user = users[user_id]
+    now = datetime.now()
+    
+    # Проверка ранга (с 7 ранга = 1200 XP)
+    if user["xp"] < 1200:
+        await update.message.reply_text("🤓 доступно с 7 ранга (1200 XP)")
         return
     
-    rank_up, new_rank = add_xp(user_id, 10, "nerd")
+    # Проверка дневного лимита
+    if user["last_nerd"] and datetime.fromisoformat(user["last_nerd"]).date() == now.date():
+        await update.message.reply_text("⚠️ Лимит: 1 🤓 в день")
+        return
     
-    response = f"🤓 +10 XP!\nВсего XP: {users[user_id]['xp']}"
+    # Начисление XP
+    user["xp"] += 10
+    user["last_nerd"] = now.isoformat()
+    
+    # Обновляем прогресс задания
+    if "quests" in user:
+        user["quests"] = update_quest_progress(user["quests"], "nerds_given")
+    
+    # Проверка повышения ранга
+    old_rank = user["rank_name"]
+    new_symbol, new_name = get_rank_info(user["xp"])
+    
+    if old_rank != new_name:
+        user["rank_symbol"] = new_symbol
+        user["rank_name"] = new_name
+        rank_up = True
+    else:
+        rank_up = False
+    
+    # Проверяем выполнение заданий
+    if "quests" in user:
+        user["quests"], rewards = check_quest_completion(user["quests"], user["xp"])
+        if rewards["xp"] > 0:
+            user["xp"] += rewards["xp"]
+    
+    save_data()
+    
+    response = f"🤓 +10 XP!\nВсего XP: {user['xp']}"
     
     if rank_up:
-        response = f"🎉 ПОЗДРАВЛЯЕМ! Новый ранг: {new_rank}\n" + response
+        response = f"🎉 ПОЗДРАВЛЯЕМ! Новый ранг: {new_name}\n" + response
     
     await update.message.reply_text(response)
+
+async def quests_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Показать задания"""
+    user_id = str(update.effective_user.id)
+    
+    if user_id not in users:
+        await update.message.reply_text("Сначала присоединитесь через /start")
+        return
+    
+    user = users[user_id]
+    user_quests = user.get("quests", {})
+    
+    # Инициализируем если нет
+    if not user_quests:
+        user_quests = init_user_quests()
+        users[user_id]["quests"] = user_quests
+        save_data()
+    
+    # Проверяем сброс
+    user_quests = check_daily_reset(user_quests)
+    
+    # Получаем доступные задания
+    available_quests = get_available_quests(user["xp"])
+    
+    # Формируем сообщение
+    message = "🎯 **ЕЖЕДНЕВНЫЕ ЗАДАНИЯ**\n\n"
+    
+    # Определяем группу рангов
+    if user["xp"] < 300:
+        rank_group = "Ранги 1-3"
+    elif user["xp"] < 1200:
+        rank_group = "Ранги 4-7"
+    else:
+        rank_group = "Ранги 7-9"
+    
+    message += f"📊 **Ваша группа:** {rank_group}\n\n"
+    
+    for quest in available_quests:
+        completed = quest["id"] in user_quests.get("completed_today", [])
+        progress = user_quests["daily_progress"].get(quest["type"], 0)
+        
+        if completed:
+            message += f"✅ **{quest['icon']} {quest['name']}**\n"
+        else:
+            if quest["type"] == "no_punishments":
+                if user_quests["daily_progress"].get("punishments_received", 0) == 0:
+                    status = "✅ Нет наказаний"
+                else:
+                    status = "❌ Были наказания"
+                message += f"⏳ **{quest['icon']} {quest['name']}** - {status}\n"
+            else:
+                message += f"⏳ **{quest['icon']} {quest['name']}** - {progress}/{quest['goal']}\n"
+            
+            message += f"   _{quest['description']}_\n"
+            message += f"   🎁 **{quest['reward_xp']} XP** + **{quest['reward_bonus']} BP**\n"
+    
+    # Статистика
+    completed_today = len(user_quests.get("completed_today", []))
+    bonus_points = user_quests.get("bonus_points", 0)
+    
+    message += f"\n📊 **Статистика:**\n"
+    message += f"✅ Выполнено сегодня: **{completed_today}**\n"
+    message += f"💎 Бонусных очков: **{bonus_points}**\n"
+    message += f"⭐ Всего XP с заданий: **{user_quests.get('total_xp_from_quests', 0)}**"
+    
+    await update.message.reply_text(message, parse_mode="Markdown")
+
+async def claim_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Получить награды за задания"""
+    user_id = str(update.effective_user.id)
+    
+    if user_id not in users:
+        await update.message.reply_text("Сначала присоединитесь через /start")
+        return
+    
+    user = users[user_id]
+    user_quests = user.get("quests", {})
+    
+    if not user_quests:
+        await update.message.reply_text("У вас нет заданий")
+        return
+    
+    # Проверяем выполнение заданий
+    user_quests, rewards = check_quest_completion(user_quests, user["xp"])
+    
+    if rewards["completed"]:
+        # Выдаем награды
+        user["xp"] += rewards["xp"]
+        user["quests"] = user_quests
+        
+        save_data()
+        
+        message = "🎉 **НАГРАДЫ ПОЛУЧЕНЫ!**\n\n"
+        for quest_name in rewards["completed"]:
+            message += f"✅ {quest_name}\n"
+        
+        message += f"\n📊 **Итого:**\n"
+        message += f"⭐ +{rewards['xp']} XP\n"
+        message += f"💎 +{rewards['bonus']} BP\n"
+        message += f"🏆 Всего XP: {user['xp']}"
+        
+        await update.message.reply_text(message, parse_mode="Markdown")
+    else:
+        await update.message.reply_text(
+            "📭 Нет выполненных заданий для получения наград\n"
+            "Продолжайте выполнять задания из /quests"
+        )
 
 async def rules_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Показать правила"""
@@ -373,7 +675,7 @@ async def mute_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         time_str = "5 минут"
     elif user["xp"] < 1700:  # Ранги 4-7
         time_str = "30 минут"
-    else:  # Ранги 8+
+    else:  # Ранги 8-9
         time_str = "7 дней"
     
     if not context.args:
@@ -431,424 +733,6 @@ async def chat_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"📜 Правила:\n{RULES_LINK}"
     )
 
-# ========== КОМАНДЫ РАЗРАБОТЧИКА ==========
-async def razrab_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Команда разработчика"""
-    user_id = str(update.effective_user.id)
-    
-    if not context.args:
-        await update.message.reply_text(
-            "🔐 Ты разработчик?\n"
-            "Тогда введи секретный код:\n"
-            "/razrab [код]"
-        )
-        return
-    
-    code = context.args[0]
-    
-    if code == DEVELOPER_CODE:
-        # Добавляем пользователя в разработчики
-        developers[user_id] = {
-            "id": update.effective_user.id,
-            "username": update.effective_user.username or "",
-            "first_name": update.effective_user.first_name,
-            "activated": datetime.now().isoformat(),
-            "access_level": "developer"
-        }
-        save_developers()
-        
-        await update.message.reply_text(
-            "✅ Доступ разработчика активирован!\n\n"
-            "🛠️ Доступные команды:\n"
-            "/dev_stats - статистика бота\n"
-            "/dev_users - список пользователей\n"
-            "/dev_givexp @user количество - выдать XP\n"
-            "/dev_setrank @user номер_ранга - установить ранг\n"
-            "/dev_warn @user причина - выдать варн\n"
-            "/dev_unwarn @user - снять варн\n"
-            "/dev_mute @user время причина - мут\n"
-            "/dev_unmute @user - размут\n"
-            "/dev_reset - сброс дневных счетчиков\n"
-        )
-    else:
-        await update.message.reply_text("❌ Неверный код!")
-
-async def dev_stats_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Статистика бота"""
-    user_id = str(update.effective_user.id)
-    
-    if not is_developer(user_id):
-        await update.message.reply_text("❌ Требуется доступ разработчика!")
-        return
-    
-    # Собираем статистику
-    total_users = len(users)
-    total_developers = len(developers)
-    
-    # Распределение по рангам
-    rank_counts = {}
-    for rank in RANKS:
-        rank_counts[rank["name"]] = 0
-    
-    for user in users.values():
-        rank_symbol = user.get("rank_symbol", "?")
-        for rank in RANKS:
-            if rank["symbol"] == rank_symbol:
-                rank_counts[rank["name"]] += 1
-                break
-    
-    # Статистика варнов
-    total_warns = 0
-    for user in users.values():
-        total_warns += len(user.get("warns", []))
-    
-    # XP статистика
-    total_xp = sum(user.get("xp", 0) for user in users.values())
-    avg_xp = total_xp / total_users if total_users > 0 else 0
-    
-    message = (
-        "📊 СТАТИСТИКА БОТА\n\n"
-        f"👥 Пользователей: {total_users}\n"
-        f"🛠️ Разработчиков: {total_developers}\n"
-        f"⭐ Всего XP: {total_xp}\n"
-        f"📈 Средний XP: {avg_xp:.1f}\n"
-        f"⚠️ Всего варнов: {total_warns}\n\n"
-        "📋 Распределение по рангам:\n"
-    )
-    
-    for rank_name, count in rank_counts.items():
-        if count > 0:
-            percentage = (count / total_users * 100) if total_users > 0 else 0
-            message += f"{rank_name}: {count} ({percentage:.1f}%)\n"
-    
-    await update.message.reply_text(message)
-
-async def dev_users_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Список пользователей"""
-    user_id = str(update.effective_user.id)
-    
-    if not is_developer(user_id):
-        await update.message.reply_text("❌ Требуется доступ разработчика!")
-        return
-    
-    if not users:
-        await update.message.reply_text("📭 Нет пользователей")
-        return
-    
-    # Сортировка по XP
-    sorted_users = sorted(users.items(), key=lambda x: x[1].get("xp", 0), reverse=True)
-    
-    message = "👥 ТОП-20 ПОЛЬЗОВАТЕЛЕЙ:\n\n"
-    
-    for i, (uid, user) in enumerate(sorted_users[:20], 1):
-        username = user.get("username", "без username")
-        first_name = user.get("first_name", "NoName")
-        xp = user.get("xp", 0)
-        rank_name = user.get("rank_name", "Луркер 🕶️")
-        warns = len(user.get("warns", []))
-        
-        message += f"{i}. {first_name} (@{username})\n"
-        message += f"   ⭐ {xp} XP | {rank_name} | ⚠️ {warns}\n"
-    
-    await update.message.reply_text(message)
-
-async def dev_givexp_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Выдать XP пользователю"""
-    user_id = str(update.effective_user.id)
-    
-    if not is_developer(user_id):
-        await update.message.reply_text("❌ Требуется доступ разработчика!")
-        return
-    
-    if len(context.args) < 2:
-        await update.message.reply_text("Использование: /dev_givexp @user количество")
-        return
-    
-    target_username = context.args[0].replace("@", "")
-    try:
-        xp_amount = int(context.args[1])
-    except ValueError:
-        await update.message.reply_text("❌ Количество должно быть числом!")
-        return
-    
-    if xp_amount <= 0:
-        await update.message.reply_text("❌ Количество должно быть положительным!")
-        return
-    
-    # Поиск пользователя
-    target_user = None
-    target_user_id = None
-    
-    for uid, user in users.items():
-        if user.get("username") == target_username:
-            target_user = user
-            target_user_id = uid
-            break
-    
-    if not target_user:
-        await update.message.reply_text("❌ Пользователь не найден!")
-        return
-    
-    # Выдаем XP
-    old_xp = target_user.get("xp", 0)
-    old_rank = target_user.get("rank_name", "")
-    
-    target_user["xp"] += xp_amount
-    
-    # Проверяем повышение ранга
-    new_symbol, new_name = get_rank_info(target_user["xp"])
-    rank_up = target_user.get("rank_symbol", "?") != new_symbol
-    
-    if rank_up:
-        target_user["rank_symbol"] = new_symbol
-        target_user["rank_name"] = new_name
-    
-    save_data()
-    
-    message = (
-        f"✅ Выдано {xp_amount} XP пользователю @{target_username}\n\n"
-        f"📊 До: {old_xp} XP ({old_rank})\n"
-        f"📊 После: {target_user['xp']} XP ({new_name})"
-    )
-    
-    if rank_up:
-        message += f"\n🎉 Повышение ранга: {new_name}"
-    
-    await update.message.reply_text(message)
-
-async def dev_setrank_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Установить ранг пользователю"""
-    user_id = str(update.effective_user.id)
-    
-    if not is_developer(user_id):
-        await update.message.reply_text("❌ Требуется доступ разработчика!")
-        return
-    
-    if len(context.args) < 2:
-        ranks_list = "\n".join([f"{i+1}. {r['symbol']} — {r['name']}" for i, r in enumerate(RANKS)])
-        await update.message.reply_text(
-            f"Использование: /dev_setrank @user номер_ранга\n\n"
-            f"Доступные ранги:\n{ranks_list}"
-        )
-        return
-    
-    target_username = context.args[0].replace("@", "")
-    try:
-        rank_num = int(context.args[1]) - 1
-    except ValueError:
-        await update.message.reply_text("❌ Номер ранга должен быть числом!")
-        return
-    
-    if rank_num < 0 or rank_num >= len(RANKS):
-        await update.message.reply_text(f"❌ Номер ранга должен быть от 1 до {len(RANKS)}")
-        return
-    
-    # Поиск пользователя
-    target_user = None
-    for uid, user in users.items():
-        if user.get("username") == target_username:
-            target_user = user
-            break
-    
-    if not target_user:
-        await update.message.reply_text("❌ Пользователь не найден!")
-        return
-    
-    # Устанавливаем ранг
-    rank = RANKS[rank_num]
-    old_rank = target_user.get("rank_name", "")
-    
-    target_user["rank_symbol"] = rank["symbol"]
-    target_user["rank_name"] = rank["name"]
-    target_user["xp"] = rank["xp"]  # Устанавливаем XP соответствующие рангу
-    
-    save_data()
-    
-    await update.message.reply_text(
-        f"✅ Установлен ранг {rank['symbol']} — {rank['name']} для @{target_username}\n"
-        f"📊 XP установлено: {rank['xp']}"
-    )
-
-async def dev_warn_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Выдать варн (разработчик)"""
-    user_id = str(update.effective_user.id)
-    
-    if not is_developer(user_id):
-        await update.message.reply_text("❌ Требуется доступ разработчика!")
-        return
-    
-    if len(context.args) < 2:
-        await update.message.reply_text("Использование: /dev_warn @user причина")
-        return
-    
-    target_username = context.args[0].replace("@", "")
-    reason = " ".join(context.args[1:])
-    
-    # Поиск пользователя
-    target_user = None
-    target_user_id = None
-    
-    for uid, user in users.items():
-        if user.get("username") == target_username:
-            target_user = user
-            target_user_id = uid
-            break
-    
-    if not target_user:
-        await update.message.reply_text("❌ Пользователь не найден!")
-        return
-    
-    # Добавляем варн
-    warn_data = {
-        "reason": reason,
-        "time": datetime.now().isoformat(),
-        "admin": f"dev:{update.effective_user.username}",
-        "type": "developer"
-    }
-    
-    target_user.setdefault("warns", []).append(warn_data)
-    save_data()
-    
-    total_warns = len(target_user.get("warns", []))
-    
-    await update.message.reply_text(
-        f"⚠️ Выдан варн пользователю @{target_username}\n"
-        f"📝 Причина: {reason}\n"
-        f"📊 Всего варнов: {total_warns}"
-    )
-
-async def dev_unwarn_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Снять варн"""
-    user_id = str(update.effective_user.id)
-    
-    if not is_developer(user_id):
-        await update.message.reply_text("❌ Требуется доступ разработчика!")
-        return
-    
-    if len(context.args) < 1:
-        await update.message.reply_text("Использование: /dev_unwarn @user")
-        return
-    
-    target_username = context.args[0].replace("@", "")
-    
-    # Поиск пользователя
-    target_user = None
-    for uid, user in users.items():
-        if user.get("username") == target_username:
-            target_user = user
-            break
-    
-    if not target_user:
-        await update.message.reply_text("❌ Пользователь не найден!")
-        return
-    
-    if not target_user.get("warns"):
-        await update.message.reply_text(f"✅ У @{target_username} нет варнов")
-        return
-    
-    # Удаляем последний варн
-    removed_warn = target_user["warns"].pop()
-    save_data()
-    
-    remaining_warns = len(target_user.get("warns", []))
-    
-    await update.message.reply_text(
-        f"✅ Снят варн с @{target_username}\n"
-        f"📝 Причина варна: {removed_warn.get('reason', 'не указана')}\n"
-        f"📊 Осталось варнов: {remaining_warns}"
-    )
-
-async def dev_mute_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Мут пользователя (разработчик)"""
-    user_id = str(update.effective_user.id)
-    
-    if not is_developer(user_id):
-        await update.message.reply_text("❌ Требуется доступ разработчика!")
-        return
-    
-    if len(context.args) < 3:
-        await update.message.reply_text("Использование: /dev_mute @user время причина\nПример: /dev_mute @user 60 Спам")
-        return
-    
-    target_username = context.args[0].replace("@", "")
-    try:
-        mute_minutes = int(context.args[1])
-    except ValueError:
-        await update.message.reply_text("❌ Время должно быть числом (минуты)!")
-        return
-    
-    reason = " ".join(context.args[2:])
-    
-    # Поиск пользователя
-    target_user = None
-    for uid, user in users.items():
-        if user.get("username") == target_username:
-            target_user = user
-            break
-    
-    if not target_user:
-        await update.message.reply_text("❌ Пользователь не найден!")
-        return
-    
-    # Устанавливаем мут
-    mute_until = datetime.now() + timedelta(minutes=mute_minutes)
-    target_user["muted_until"] = mute_until.isoformat()
-    save_data()
-    
-    await update.message.reply_text(
-        f"🔇 Мут пользователю @{target_username}\n"
-        f"⏰ На: {mute_minutes} минут\n"
-        f"📝 Причина: {reason}\n"
-        f"🕒 До: {mute_until.strftime('%d.%m.%Y %H:%M')}"
-    )
-
-async def dev_unmute_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Размут пользователя"""
-    user_id = str(update.effective_user.id)
-    
-    if not is_developer(user_id):
-        await update.message.reply_text("❌ Требуется доступ разработчика!")
-        return
-    
-    if len(context.args) < 1:
-        await update.message.reply_text("Использование: /dev_unmute @user")
-        return
-    
-    target_username = context.args[0].replace("@", "")
-    
-    # Поиск пользователя
-    target_user = None
-    for uid, user in users.items():
-        if user.get("username") == target_username:
-            target_user = user
-            break
-    
-    if not target_user:
-        await update.message.reply_text("❌ Пользователь не найден!")
-        return
-    
-    if not target_user.get("muted_until"):
-        await update.message.reply_text(f"✅ @{target_username} не в муте")
-        return
-    
-    # Снимаем мут
-    old_mute = target_user.pop("muted_until", None)
-    save_data()
-    
-    await update.message.reply_text(f"✅ Пользователь @{target_username} размучен")
-
-async def dev_reset_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Сброс дневных счетчиков"""
-    user_id = str(update.effective_user.id)
-    
-    if not is_developer(user_id):
-        await update.message.reply_text("❌ Требуется доступ разработчика!")
-        return
-    
-    reset_daily_counts()
-    
-    await update.message.reply_text("✅ Дневные счетчики сброшены!")
-
 async def sticker_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработка стикеров - антиспам"""
     user_id = str(update.effective_user.id)
@@ -875,6 +759,11 @@ async def sticker_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         }
         
         users[user_id]["warns"].append(warn_data)
+        
+        # Отмечаем наказание для заданий
+        if "quests" in users[user_id]:
+            users[user_id]["quests"] = update_quest_progress(users[user_id]["quests"], "punishments_received")
+        
         save_data()
         
         await update.message.reply_text(
@@ -890,7 +779,6 @@ def main():
     """Основная функция запуска бота"""
     # Загружаем данные
     load_data()
-    load_developers()
     
     # Создаем приложение
     app = Application.builder().token(TOKEN).build()
@@ -898,24 +786,14 @@ def main():
     # Добавляем обработчики команд
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("profile", profile))
+    app.add_handler(CommandHandler("quests", quests_cmd))
+    app.add_handler(CommandHandler("claim", claim_cmd))
     app.add_handler(CommandHandler("rules", rules_cmd))
     app.add_handler(CommandHandler("chat", chat_cmd))
     app.add_handler(CommandHandler("helpadmin", helpadmin_cmd))
     app.add_handler(CommandHandler("mute", mute_cmd))
     app.add_handler(CommandHandler("warn", warn_cmd))
     app.add_handler(CommandHandler("ban", ban_cmd))
-    
-    # Команды разработчика
-    app.add_handler(CommandHandler("razrab", razrab_cmd))
-    app.add_handler(CommandHandler("dev_stats", dev_stats_cmd))
-    app.add_handler(CommandHandler("dev_users", dev_users_cmd))
-    app.add_handler(CommandHandler("dev_givexp", dev_givexp_cmd))
-    app.add_handler(CommandHandler("dev_setrank", dev_setrank_cmd))
-    app.add_handler(CommandHandler("dev_warn", dev_warn_cmd))
-    app.add_handler(CommandHandler("dev_unwarn", dev_unwarn_cmd))
-    app.add_handler(CommandHandler("dev_mute", dev_mute_cmd))
-    app.add_handler(CommandHandler("dev_unmute", dev_unmute_cmd))
-    app.add_handler(CommandHandler("dev_reset", dev_reset_cmd))
     
     # Обработчики реакций (эмодзи)
     app.add_handler(MessageHandler(filters.Regex("❤️"), heart_xp))
